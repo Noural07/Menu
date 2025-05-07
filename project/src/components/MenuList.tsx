@@ -68,7 +68,7 @@ const MenuList: React.FC = () => {
   return (
     <div className="pb-20">
       {/* Category filter */}
-      <div className="overflow-x-auto px-4 py-3 mb-4 sticky top-16 bg-white z-[5] shadow-sm">
+      <div className="overflow-x-auto px-4 py-3 mb-4 sticky top-1 bg-white z-[5] shadow-sm">
         <div className="flex space-x-2">
           <button
             onClick={() => setActiveCategory(null)}
