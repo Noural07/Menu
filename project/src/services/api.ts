@@ -5,8 +5,10 @@ const API_BASE_URL = 'https://localhost:7012/api';
 /**
  * Udtrækker en query parameter fra URL'en (fx ?cafe=2 → cafeId = 2)
  */
-const getCafeIdFromUrl = (): number => {
-  return 16; // 👈 hardcoded til test
+const getCafeIdFromUrl = (): number | null => {
+  const params = new URLSearchParams(window.location.search);
+  const cafeIdParam = params.get('cafe');
+  return cafeIdParam ? parseInt(cafeIdParam, 10) : null;
 };
 
 /**
@@ -57,7 +59,7 @@ export const getMenuItems = async (): Promise<APIResponse<MenuItem[]>> => {
  */
 export const startOrder = async (tableId: number): Promise<APIResponse<number>> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/CustomerOrder/start`, {
+    const response = await fetch(`${API_BASE_URL}/customerorder/start`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -89,7 +91,7 @@ export const startOrder = async (tableId: number): Promise<APIResponse<number>> 
  */
 export const addItemToOrder = async (item: AddOrderItemRequest): Promise<APIResponse<any>> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/CustomerOrder/add-item`, {
+    const response = await fetch(`${API_BASE_URL}/customerorder/add-item`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -117,7 +119,7 @@ export const addItemToOrder = async (item: AddOrderItemRequest): Promise<APIResp
  */
 export const addCommentToOrder = async (orderId: number, comment: string): Promise<APIResponse<any>> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/CustomerOrder/comment`, {
+    const response = await fetch(`${API_BASE_URL}/customerorder/comment`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
