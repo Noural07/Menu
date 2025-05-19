@@ -3,7 +3,7 @@ import { MenuItem, Order, CartItem, APIResponse, AddOrderItemRequest } from '../
 const API_BASE_URL = 'https://localhost:7012/api';
 
 /**
- * Udtrækker en query parameter fra URL'en (fx ?cafe=2 → cafeId = 2)
+ * Udtrækker en query parameter fra URL'en (fx ?cafe=2 → cafeId = 2) du kan tilpasse den 
  */
 const getCafeIdFromUrl = (): number | null => {
   const params = new URLSearchParams(window.location.search);
