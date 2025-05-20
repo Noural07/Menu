@@ -57,14 +57,7 @@ const CartItem: React.FC<CartItemProps> = ({
           Total: {formatPrice(totalPrice)}
         </p>
         
-        <button
-          onClick={() => onRemove(item.id)}
-          className="mt-2 text-red-500 hover:text-red-700 flex items-center text-sm"
-          aria-label="Remove item"
-        >
-          <Trash2 size={14} className="mr-1" />
-          Remove
-        </button>
+
       </div>
     </div>
   );

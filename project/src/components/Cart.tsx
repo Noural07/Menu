@@ -53,7 +53,7 @@ const Cart: React.FC<CartProps> = ({ isOpen, onClose }) => {
 
     try {
       // STEP 1: Start the order to get orderId
-      const start = await startOrder(6);
+      const start = await startOrder(1);
       if (!start.success || !start.data) {
         throw new Error(start.error || 'Failed to start order');
       }

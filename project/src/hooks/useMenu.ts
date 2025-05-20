@@ -1,51 +1,49 @@
 import { useState, useEffect } from 'react';
-import { MenuItem } from '../types';
+import { MenuItem, Category } from '../types';
 import { getMenuItems } from '../services/api';
 
+/** Return-objekt fra hook */
 interface UseMenuResult {
   menuItems: MenuItem[];
-  categories: string[];
+  categories: Category[];    // objekt — ikke string længere
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
 }
 
 export const useMenu = (): UseMenuResult => {
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [menuItems,  setMenuItems]  = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading,  setLoading]    = useState(true);
+  const [error,      setError]      = useState<string | null>(null);
 
-  const fetchMenuItems = async () => {
-    setIsLoading(true);
+  /** henter menu og bygger kategori-listen */
+  const fetchMenu = async () => {
+    setLoading(true);
     setError(null);
-    
-    const response = await getMenuItems();
-    
-    if (response.success && response.data) {
-      setMenuItems(response.data);
-      
-      // Extract unique categories
-      const uniqueCategories = Array.from(
-        new Set(response.data.map(item => item.category))
-      ).sort();
-      setCategories(uniqueCategories);
-    } else {
-      setError(response.error || 'Failed to fetch menu items');
+
+    const res = await getMenuItems();
+
+    if (!res.success || !res.data) {
+      setError(res.error || 'Failed to fetch menu');
+      setLoading(false);
+      return;
     }
-    
-    setIsLoading(false);
+
+    setMenuItems(res.data);
+
+    /* 1) læg unikke {id,name} ind i et Map  */
+    const map = new Map<number, string>();
+    res.data.forEach(i => map.set(i.categoryId, i.categoryName));
+
+    /* 2) konverter til sorteret array */
+    const cats: Category[] = Array.from(map, ([id, name]) => ({ id, name }))
+                                  .sort((a, b) => a.name.localeCompare(b.name));
+    setCategories(cats);
+    setLoading(false);
   };
 
-  useEffect(() => {
-    fetchMenuItems();
-  }, []);
+  useEffect(() => { fetchMenu(); }, []);
 
-  return {
-    menuItems,
-    categories,
-    isLoading,
-    error,
-    refetch: fetchMenuItems
-  };
+  return { menuItems, categories, isLoading, error, refetch: fetchMenu };
 };

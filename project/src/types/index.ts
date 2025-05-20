@@ -2,11 +2,21 @@
 export interface MenuItem {
   id: number;
   name: string;
-  description: string;
   price: number;
-  category: string;
+  itemCode: number;
   imageUrl?: string;
+  description?: string;
+
+  categoryId: number;
+  categoryName: string;
 }
+
+// 👉 eksportér Category så den kan genbruges
+export interface Category {
+  id: number;
+  name: string;
+}
+
 
 // Cart item (local use only)
 export interface CartItem extends MenuItem {

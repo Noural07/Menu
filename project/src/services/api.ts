@@ -1,174 +1,142 @@
-import { MenuItem, Order, CartItem, APIResponse, AddOrderItemRequest } from '../types';
-
-const API_BASE_URL = 'https://localhost:7012/api';
+import { MenuItem, Order, CartItem, APIResponse, AddOrderItemRequest } from "../types";
 
 /**
- * Udtrækker en query parameter fra URL'en (fx ?cafe=2 → cafeId = 2) du kan tilpasse den 
+ * Base URL for the backend API (adjust through env‑vars for prod/staging).
  */
-const getCafeIdFromUrl = (): number | null => {
+const API_BASE_URL = "https://localhost:7012/api";
+
+/**
+ * Pulls the `cafe` query parameter from the location bar.
+ * Throws early if it is missing or invalid – that makes bugs obvious during dev.
+ */
+export const getCafeIdFromUrl = (): number => {
   const params = new URLSearchParams(window.location.search);
-  const cafeIdParam = params.get('cafe');
-  return cafeIdParam ? parseInt(cafeIdParam, 10) : null;
+  const raw = params.get("cafe");
+  if (!raw) throw new Error("Café ID not found in URL.");
+  const id = Number.parseInt(raw, 10);
+  if (Number.isNaN(id)) throw new Error("Café ID in URL is not a valid number.");
+  return id;
 };
 
+/** ──────────────────────────────────────────────────────────────────────────
+ * Helpers
+ * ────────────────────────────────────────────────────────────────────────*/
 /**
- * Mapper CartItem til backend DTO-format
+ * Attempts to parse the response body as JSON.  If the body is empty (e.g. 204
+ * No‑Content) or not valid JSON, it resolves to `null` instead of throwing –
+ * preventing the common “Unexpected end of JSON input” runtime error.
  */
-const mapCartItemsToDto = (orderId: number, cart: CartItem[]): AddOrderItemRequest[] => {
-  return cart.map(item => ({
+const safeJson = async <T = unknown>(response: Response): Promise<T | null> => {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+};
+
+/** Maps cart lines to the DTO the backend expects. */
+const mapCartItemsToDto = (
+  orderId: number,
+  cart: CartItem[]
+): AddOrderItemRequest[] => {
+  const cafeId = getCafeIdFromUrl();
+  return cart.map(({ itemCode, quantity }) => ({
     orderId,
-    cafeId: item.cafeId,
-    itemCode: item.itemCode,
-    quantity: item.quantity
+    cafeId,
+    itemCode,
+    quantity,
   }));
 };
 
-/**
- * Henter menuen for en specifik café (offentlig adgang via cafeId)
- */
+/** ──────────────────────────────────────────────────────────────────────────
+ * API calls
+ * ────────────────────────────────────────────────────────────────────────*/
 export const getMenuItems = async (): Promise<APIResponse<MenuItem[]>> => {
-  const cafeId = getCafeIdFromUrl();
-
-  if (!cafeId) {
-    return {
-      success: false,
-      error: 'Café ID not found in URL.',
-    };
-  }
-
   try {
-    const response = await fetch(`${API_BASE_URL}/Menu/public/${cafeId}`);
-
-    if (!response.ok) {
-      throw new Error(`Error fetching menu: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    console.error('Failed to fetch menu items:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch menu items',
-    };
+    const cafeId = getCafeIdFromUrl();
+    const res = await fetch(`${API_BASE_URL}/Menu/public/${cafeId}`);
+    if (!res.ok) throw new Error(res.statusText);
+    return { success: true, data: (await res.json()) as MenuItem[] };
+  } catch (err) {
+    console.error("getMenuItems() failed", err);
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 };
 
-/**
- * Starter en ny ordre
- */
-export const startOrder = async (tableId: number): Promise<APIResponse<number>> => {
+export const startOrder = async (
+  tableId: number
+): Promise<APIResponse<number>> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/customerorder/start`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        tableId,
-        customerId: null,
-        comment: null
-      }),
+    const res = await fetch(`${API_BASE_URL}/customerorder/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tableId, customerId: null, comment: null }),
     });
-
-    if (!response.ok) {
-      throw new Error(`Error starting order: ${response.statusText}`);
-    }
-
-    const data = await response.json(); // expects orderId
-    return { success: true, data };
-  } catch (error) {
-    console.error('Failed to start order:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to start order',
-    };
+    if (!res.ok) throw new Error(res.statusText);
+    return { success: true, data: (await res.json()) as number };
+  } catch (err) {
+    console.error("startOrder() failed", err);
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 };
 
-/**
- * Tilføjer ét item til en ordre
- */
-export const addItemToOrder = async (item: AddOrderItemRequest): Promise<APIResponse<any>> => {
+export const addItemToOrder = async (
+  item: AddOrderItemRequest
+): Promise<APIResponse<null>> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/customerorder/add-item`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const res = await fetch(`${API_BASE_URL}/customerorder/add-item`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(item),
     });
-
-    if (!response.ok) {
-      throw new Error(`Error adding item to order: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    console.error('Failed to add item to order:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to add item to order',
-    };
+    if (!res.ok) throw new Error(res.statusText);
+    await safeJson(res); // we ignore the value; we only care that the call succeeded
+    return { success: true };
+  } catch (err) {
+    console.error("addItemToOrder() failed", err);
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 };
 
-/**
- * Tilføjer en kommentar til en ordre
- */
-export const addCommentToOrder = async (orderId: number, comment: string): Promise<APIResponse<any>> => {
+export const addCommentToOrder = async (
+  orderId: number,
+  comment: string
+): Promise<APIResponse<null>> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/customerorder/comment`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const res = await fetch(`${API_BASE_URL}/customerorder/comment`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId, comment }),
     });
-
-    if (!response.ok) {
-      throw new Error(`Error adding comment to order: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return { success: true, data };
-  } catch (error) {
-    console.error('Failed to add comment to order:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to add comment to order',
-    };
+    if (!res.ok) throw new Error(res.statusText);
+    await safeJson(res);
+    return { success: true };
+  } catch (err) {
+    console.error("addCommentToOrder() failed", err);
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 };
 
-/**
- * Sender hele ordren til serveren
- */
-export const submitOrder = async (orderId: number, order: Order): Promise<APIResponse<any>> => {
+export const submitOrder = async (
+  orderId: number,
+  order: Order
+): Promise<APIResponse<void>> => {
   try {
-    const itemsDto = mapCartItemsToDto(orderId, order.items);
-
-    for (const item of itemsDto) {
-      const itemResponse = await addItemToOrder(item);
-      if (!itemResponse.success) {
-        throw new Error(itemResponse.error);
-      }
+    // 1️⃣ Post items sequentially (can be parallelised later if needed)
+    for (const dto of mapCartItemsToDto(orderId, order.items)) {
+      const res = await addItemToOrder(dto);
+      if (!res.success) throw new Error(res.error);
     }
 
-    if (order.comment && order.comment.trim() !== '') {
-      const commentResponse = await addCommentToOrder(orderId, order.comment);
-      if (!commentResponse.success) {
-        throw new Error(commentResponse.error);
-      }
+    // 2️⃣ Optional comment
+    if (order.comment?.trim()) {
+      const res = await addCommentToOrder(orderId, order.comment);
+      if (!res.success) throw new Error(res.error);
     }
 
     return { success: true };
-  } catch (error) {
-    console.error('Failed to submit order:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to submit order',
-    };
+  } catch (err) {
+    console.error("submitOrder() failed", err);
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
 };
