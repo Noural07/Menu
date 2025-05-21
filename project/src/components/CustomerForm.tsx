@@ -1,81 +1,168 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useTableList } from '../hooks/useTable';
 import { startOrder } from '../services/api';
+import { FormCard } from './FormCard';
+import { Input, Select, Button } from './FormElements';
+import AnimatedBackground from './AnimatedBackground';
+import { floatingAnimation, fadeIn } from '../styles/animations';
 
 const CustomerForm: React.FC = () => {
-  const { tables, loading, error } = useTableList();
+  const { tables, loading: tablesLoading, error: tablesError } = useTableList();
   const { dispatch } = useCart();
 
   const [tableId, setTableId] = useState<number>();
-  const [name, setName]       = useState('');
-  const [err, setErr]         = useState<string|null>(null);
-  const [busy, setBusy]       = useState(false);
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Mouse follow effect for the logo
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const rotateX = useTransform(mouseY, [-300, 300], [10, -10]);
+  const rotateY = useTransform(mouseX, [-300, 300], [-10, 10]);
 
-  const handleStart = async () => {
-    if (!tableId)          { setErr('Choose a table'); return; }
-    if (!name.trim())      { setErr('Enter your name'); return; }
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const { clientX, clientY } = e;
+      const { innerWidth, innerHeight } = window;
+      const centerX = innerWidth / 2;
+      const centerY = innerHeight / 2;
+      
+      mouseX.set(clientX - centerX);
+      mouseY.set(clientY - centerY);
+    };
 
-    setErr(null);
-    setBusy(true);
+    window.addEventListener('mousemove', handleMouseMove);
+    
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [mouseX, mouseY]);
 
-    const res = await startOrder({
-      tableId,
-      customerName: name.trim(),
-    });
-
-    setBusy(false);
-
-    if (!res.success || !res.data) {
-      setErr(res.error || 'Failed to start order');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!tableId) {
+      setError('Please select a table');
       return;
     }
-
-    dispatch({ type: 'SET_ORDER_ID',     payload: res.data });
-    dispatch({ type: 'SET_TABLE_ID',     payload: tableId });
-    dispatch({ type: 'SET_CUSTOMER_NAME',payload: name.trim() });
+    
+    if (!name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+    
+    setError(null);
+    setSubmitting(true);
+    
+    try {
+      const res = await startOrder({ tableId, customerName: name.trim() });
+      
+      if (!res.success || !res.data) {
+        setError(res.error || 'Failed to start your order. Please try again.');
+        return;
+      }
+      
+      dispatch({ type: 'SET_ORDER_ID', payload: res.data });
+      dispatch({ type: 'SET_TABLE_ID', payload: tableId });
+      dispatch({ type: 'SET_CUSTOMER_NAME', payload: name.trim() });
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
+  const tableOptions = [
+    { value: '', label: '– Select a table –' },
+    ...(tables || []).map(table => ({
+      value: table.id,
+      label: table.label
+    }))
+  ];
+
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center p-4">
-      <h2 className="text-2xl font-bold mb-6">Welcome to Bella Cucina</h2>
+    <div className="relative min-h-screen flex flex-col items-center justify-center px-4 py-12 overflow-hidden">
+      {/* Animated Background */}
+      <AnimatedBackground />
+      
+      {/* Floating logo */}
+      <motion.div
+        className="mb-8 relative z-10"
+        style={{ rotateX, rotateY, perspective: 1000 }}
+        animate={floatingAnimation}
+      >
+        <motion.div
+          variants={fadeIn}
+          initial="hidden"
+          animate="visible"
+          custom={0}
+          className="text-center"
+        >
+          <h1 className="text-4xl md:text-5xl font-serif font-bold text-primary-800 mb-2"
+              style={{ textShadow: '0 2px 10px rgba(255,255,255,0.3)' }}>
+            Bella Cucina
+          </h1>
+          <p className="text-sm text-neutral-700 tracking-wider uppercase">Authentic Italian Experience</p>
+        </motion.div>
+      </motion.div>
+      
+      {/* Main form */}
+      <FormCard 
+        title="Welcome"
+        error={error || tablesError || undefined}
+        loading={tablesLoading}
+      >
+        {!tablesLoading && (
+          <form onSubmit={handleSubmit}>
+            <motion.div variants={fadeIn} custom={1} className="mb-4">
+              <Select
+                options={tableOptions}
+                value={tableId ?? ''}
+                onChange={e => setTableId(Number(e.target.value) || undefined)}
+                placeholder="Select your table"
+                aria-label="Table selection"
+              />
+            </motion.div>
+            
+            <motion.div variants={fadeIn} custom={2} className="mb-6">
+              <Input
+                type="text"
+                placeholder="Your name"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                aria-label="Your name"
+              />
+            </motion.div>
+            
+           <motion.div variants={fadeIn} custom={3}>
+   <Button 
+     type="submit"
+     variant="primary"
+     loading={submitting}
+     disabled={submitting}
+     className="w-full bg-[#8B0000]" // Tilføj baggrundsfarven her
+   >
+     Start ordering
+   </Button>
+</motion.div>
 
-      {loading && <p>Loading tables…</p>}
-      {error   && <p className="text-red-500">{error}</p>}
-
-      {!loading && !error && (
-        <div className="space-y-4 w-full max-w-sm">
-          <select
-            className="border px-3 py-2 rounded w-full"
-            value={tableId ?? ''}
-            onChange={e => setTableId(Number(e.target.value))}
-          >
-            <option value="">– choose table –</option>
-            {tables.map(t => (
-              <option key={t.id} value={t.id}>{t.label}</option>
-            ))}
-          </select>
-
-          <input
-            type="text"
-            placeholder="Your name"
-            className="border px-3 py-2 rounded w-full"
-            value={name}
-            onChange={e => setName(e.target.value)}
-          />
-
-          {err && <p className="text-red-500 text-sm">{err}</p>}
-
-          <button
-            type="button"
-            disabled={busy}
-            onClick={handleStart}
-            className="w-full bg-[#8B0000] text-white py-2 rounded hover:bg-[#6B0000]"
-          >
-            {busy ? 'Starting…' : 'Start ordering'}
-          </button>
-        </div>
-      )}
+          </form>
+        )}
+      </FormCard>
+      
+      {/* Footer note */}
+      <motion.p 
+        variants={fadeIn}
+        initial="hidden"
+        animate="visible"
+        custom={5}
+        className="mt-6 text-sm text-neutral-600 text-center max-w-xs"
+      >
+        Our staff will be with you shortly after you submit your information.
+      </motion.p>
     </div>
   );
 };
