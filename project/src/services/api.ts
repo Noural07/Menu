@@ -1,56 +1,49 @@
-import { MenuItem, Order, CartItem, APIResponse, AddOrderItemRequest } from "../types";
+import {
+  MenuItem,
+  Order,
+  CartItem,
+  Table,
+  StartCustomerOrderRequest,
+  AddOrderItemRequest,
+  APIResponse,
+} from '../types';
 
-/**
- * Base URL for the backend API (adjust through env‑vars for prod/staging).
- */
-const API_BASE_URL = "https://localhost:7012/api";
+const API_BASE_URL = 'https://localhost:7012/api';
 
-/**
- * Pulls the `cafe` query parameter from the location bar.
- * Throws early if it is missing or invalid – that makes bugs obvious during dev.
- */
-export const getCafeIdFromUrl = (): number => {
-  const params = new URLSearchParams(window.location.search);
-  const raw = params.get("cafe");
-  if (!raw) throw new Error("Café ID not found in URL.");
+/* ─ helpers ─ */
+const getCafeIdFromUrl = (): number => {
+  const raw = new URLSearchParams(window.location.search).get('cafe');
+  if (!raw) throw new Error('Café ID not found in URL.');
   const id = Number.parseInt(raw, 10);
-  if (Number.isNaN(id)) throw new Error("Café ID in URL is not a valid number.");
+  if (Number.isNaN(id)) throw new Error('Café ID is not a number.');
   return id;
 };
 
-/** ──────────────────────────────────────────────────────────────────────────
- * Helpers
- * ────────────────────────────────────────────────────────────────────────*/
-/**
- * Attempts to parse the response body as JSON.  If the body is empty (e.g. 204
- * No‑Content) or not valid JSON, it resolves to `null` instead of throwing –
- * preventing the common “Unexpected end of JSON input” runtime error.
- */
-const safeJson = async <T = unknown>(response: Response): Promise<T | null> => {
-  try {
-    return (await response.json()) as T;
-  } catch {
-    return null;
-  }
+const safeJson = async <T>(r: Response): Promise<T | null> => {
+  try   { return (await r.json()) as T; } catch { return null; }
 };
 
-/** Maps cart lines to the DTO the backend expects. */
-const mapCartItemsToDto = (
-  orderId: number,
-  cart: CartItem[]
-): AddOrderItemRequest[] => {
-  const cafeId = getCafeIdFromUrl();
-  return cart.map(({ itemCode, quantity }) => ({
+const mapCart = (orderId: number, items: CartItem[]): AddOrderItemRequest[] =>
+  items.map(({ itemCode, quantity, cafeId }) => ({
     orderId,
     cafeId,
     itemCode,
     quantity,
   }));
+
+/* ─ public tables ─ */
+export const getTables = async (): Promise<APIResponse<Table[]>> => {
+  try {
+    const cafeId = getCafeIdFromUrl();
+    const res = await fetch(`${API_BASE_URL}/tables/public/${cafeId}`);
+    if (!res.ok) throw new Error(res.statusText);
+    return { success: true, data: (await res.json()) as Table[] };
+  } catch (err) {
+    return { success: false, error: (err as Error).message };
+  }
 };
 
-/** ──────────────────────────────────────────────────────────────────────────
- * API calls
- * ────────────────────────────────────────────────────────────────────────*/
+/* ─ public menu ─ */
 export const getMenuItems = async (): Promise<APIResponse<MenuItem[]>> => {
   try {
     const cafeId = getCafeIdFromUrl();
@@ -58,85 +51,79 @@ export const getMenuItems = async (): Promise<APIResponse<MenuItem[]>> => {
     if (!res.ok) throw new Error(res.statusText);
     return { success: true, data: (await res.json()) as MenuItem[] };
   } catch (err) {
-    console.error("getMenuItems() failed", err);
-    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+    return { success: false, error: (err as Error).message };
   }
 };
 
+/* ─ start ticket ─ */
 export const startOrder = async (
-  tableId: number
+  req: StartCustomerOrderRequest,
 ): Promise<APIResponse<number>> => {
   try {
-    const res = await fetch(`${API_BASE_URL}/customerorder/start`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tableId, customerId: null, comment: null }),
+    const r = await fetch(`${API_BASE_URL}/customerorder/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
     });
-    if (!res.ok) throw new Error(res.statusText);
-    return { success: true, data: (await res.json()) as number };
+    if (!r.ok) throw new Error(await r.text());
+    return { success: true, data: (await r.json()) as number };
   } catch (err) {
-    console.error("startOrder() failed", err);
-    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+    return { success: false, error: (err as Error).message };
   }
 };
 
+/* ─ add single line ─ */
 export const addItemToOrder = async (
-  item: AddOrderItemRequest
+  item: AddOrderItemRequest,
 ): Promise<APIResponse<null>> => {
   try {
-    const res = await fetch(`${API_BASE_URL}/customerorder/add-item`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    const r = await fetch(`${API_BASE_URL}/customerorder/add-item`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(item),
     });
-    if (!res.ok) throw new Error(res.statusText);
-    await safeJson(res); // we ignore the value; we only care that the call succeeded
+    if (!r.ok) throw new Error(r.statusText);
+    await safeJson(r);
     return { success: true };
   } catch (err) {
-    console.error("addItemToOrder() failed", err);
-    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+    return { success: false, error: (err as Error).message };
   }
 };
 
+/* ─ optional comment ─ */
 export const addCommentToOrder = async (
   orderId: number,
-  comment: string
+  comment: string,
 ): Promise<APIResponse<null>> => {
   try {
-    const res = await fetch(`${API_BASE_URL}/customerorder/comment`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
+    const r = await fetch(`${API_BASE_URL}/customerorder/comment`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId, comment }),
     });
-    if (!res.ok) throw new Error(res.statusText);
-    await safeJson(res);
+    if (!r.ok) throw new Error(r.statusText);
+    await safeJson(r);
     return { success: true };
   } catch (err) {
-    console.error("addCommentToOrder() failed", err);
-    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+    return { success: false, error: (err as Error).message };
   }
 };
 
+/* ─ submit full order ─ */
 export const submitOrder = async (
-  orderId: number,
-  order: Order
+  order: Order,             // orderId now travels *inside* this object
 ): Promise<APIResponse<void>> => {
   try {
-    // 1️⃣ Post items sequentially (can be parallelised later if needed)
-    for (const dto of mapCartItemsToDto(orderId, order.items)) {
+    for (const dto of mapCart(order.orderId!, order.items)) {
       const res = await addItemToOrder(dto);
       if (!res.success) throw new Error(res.error);
     }
-
-    // 2️⃣ Optional comment
     if (order.comment?.trim()) {
-      const res = await addCommentToOrder(orderId, order.comment);
+      const res = await addCommentToOrder(order.orderId!, order.comment);
       if (!res.success) throw new Error(res.error);
     }
-
     return { success: true };
   } catch (err) {
-    console.error("submitOrder() failed", err);
-    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+    return { success: false, error: (err as Error).message };
   }
 };

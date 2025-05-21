@@ -1,38 +1,36 @@
-// Menu item shown in UI
+// src/types/index.ts
+/* ---------------- server data – used in UI ---------------- */
 export interface MenuItem {
   id: number;
+  cafeId: number;        // ← ➊ ADD THIS LINE
   name: string;
   price: number;
   itemCode: number;
   imageUrl?: string;
   description?: string;
-
   categoryId: number;
   categoryName: string;
 }
 
-// 👉 eksportér Category så den kan genbruges
 export interface Category {
   id: number;
   name: string;
 }
 
-
-// Cart item (local use only)
+/* ---------------- local (cart) ---------------- */
 export interface CartItem extends MenuItem {
   quantity: number;
-  cafeId: number;
-  itemCode: number; // added to match backend
 }
 
-// Used to build the order
+/* ---------------- order DTOs ------------------ */
 export interface Order {
+  orderId?: number;          // created by the server
   tableId: number;
+  customerName: string;
   items: CartItem[];
   comment?: string;
 }
 
-// Backend DTOs
 export interface AddOrderItemRequest {
   orderId: number;
   cafeId: number;
@@ -40,12 +38,18 @@ export interface AddOrderItemRequest {
   quantity: number;
 }
 
-export interface SaveCommentRequest {
-  orderId: number;
-  comment: string;
+export interface StartCustomerOrderRequest {
+  tableId: number;
+  customerName: string;
+  comment?: string;
 }
 
-// Generic API response wrapper
+/* ---------------- misc ------------------------ */
+export interface Table {
+  id: number;
+  label: string;
+}
+
 export interface APIResponse<T> {
   success: boolean;
   data?: T;
