@@ -8,7 +8,7 @@ import {
   APIResponse,
 } from '../types';
 
-const API_BASE_URL = 'https://dokumentationssystem-cuj4.onrender.com/api';
+const API_BASE_URL = 'https://dokumentationssystem-cuj4.onrender.com';
 
 /* ─ helpers ─ */
 const getCafeIdFromUrl = (): number => {
