@@ -8,19 +8,22 @@ import {
   APIResponse,
 } from '../types';
 
-const API_BASE_URL = 'https://localhost:7012/api';
+const API_BASE_URL = 'https://dokumentationssystem-cuj4.onrender.com/api';
 
 /* ─ helpers ─ */
 const getCafeIdFromUrl = (): number => {
-  const raw = new URLSearchParams(window.location.search).get('cafe');
-  if (!raw) throw new Error('Café ID not found in URL.');
-  const id = Number.parseInt(raw, 10);
-  if (Number.isNaN(id)) throw new Error('Café ID is not a number.');
-  return id;
+  // Try to extract cafeId from `/menu/{cafeId}` path
+  const match = window.location.pathname.match(/\/menu\/(\d+)/);
+  if (match && match[1]) {
+    const id = Number.parseInt(match[1], 10);
+    if (!Number.isNaN(id)) return id;
+    throw new Error('Café ID in URL path is not a number.');
+  }
+  throw new Error('Café ID not found in URL path.');
 };
 
 const safeJson = async <T>(r: Response): Promise<T | null> => {
-  try   { return (await r.json()) as T; } catch { return null; }
+  try { return (await r.json()) as T; } catch { return null; }
 };
 
 const mapCart = (orderId: number, items: CartItem[]): AddOrderItemRequest[] =>
@@ -111,7 +114,7 @@ export const addCommentToOrder = async (
 
 /* ─ submit full order ─ */
 export const submitOrder = async (
-  order: Order,             // orderId now travels *inside* this object
+  order: Order, // orderId now travels *inside* this object
 ): Promise<APIResponse<void>> => {
   try {
     for (const dto of mapCart(order.orderId!, order.items)) {
